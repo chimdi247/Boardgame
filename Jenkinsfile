@@ -1,27 +1,56 @@
 pipeline {
     agent any
-    
+
     tools {
-        jdk 'jdk17'
-        maven 'maven3.9'
+        maven 'maven3'
+        jdk 'jdk17'  
     }
-    
-    stages {   
-        stage('Compile') {
+
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+
+    stages {
+        stage('Git Checkout') {
             steps {
-            sh 'mvn compile'
+                git branch: 'main', url: 'https://github.com/chimdi247/Boardgame.git'
             }
         }
-        
-        stage('Test') {
+
+        stage('Compilation') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+
+        stage('Testing') {
             steps {
                 sh 'mvn test'
             }
         }
-        
-        stage('Build') {
+         stage('Build') {
             steps {
                 sh 'mvn package'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                            -Dsonar.projectName=Boardgame \
+                            -Dsonar.projectKey=Boardgame \
+                            -Dsonar.java.binaries=target
+                    '''
+                }
+            }
+        }
+          stage('Quality Gate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
             }
         }
     }
